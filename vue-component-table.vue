@@ -1,15 +1,15 @@
 const tableComponent = Vue.component('table-component', {
     template:`
     <div class="row">
-        <div class="input-field col s6">
-            <input placeholder="Filtrar" id="buscador" class="validate" type="text" v-model="filter" v-on:keyup="filterArray()">
+        <div class="">
             <label for="buscador" class="active">Filtrar</label>
+            <input placeholder="Filtrar" id="buscador" class="validate" type="text" v-model="filter" v-on:keyup="filterArray()">
         </div>
         <div class="col s12">
-            <table class="">
+            <table :class="classTable">
                 <thead>
                     <tr>
-                        <th v-for="(header, header_index) in headerTable"> {{ header }} </th>
+                        <th v-for="(header, header_index) in headerTable" v-on:click="sortArray(attrDisplay[header_index])"> {{ header }} </th>
                         <th v-if="actions"> {{ actionHeaders }} </th>
                     </tr>
                 </thead>
@@ -19,6 +19,9 @@ const tableComponent = Vue.component('table-component', {
                         <td v-if="actions">
                             <button v-for="btn in buttons" :class="btn.class" v-on:click="btnEvents(btn.action, body )"> {{btn.icon}} {{ btn.labelButton }} </button>
                         </td>
+                    </tr>
+                    <tr v-if="bodyTableRender.length == 0">
+                        <td :colspan="headerTable.length"> No se han encontrado registros </td>
                     </tr>
                 </tbody>
             </table>
@@ -40,14 +43,23 @@ const tableComponent = Vue.component('table-component', {
     `,
     data:function(){
         return {
-            currentPage:1,
-            lastPage:'',
-            pagesArray:[],
-            itemsTotal:[],
-            filter:''
+            currentPage:1,      // Pagina por defecto
+            lastPage:'',        // Última página
+            pagesArray:[],      // Array que contendra las paginas a mostrar
+            itemsTotal:[],      // Array que contendra los datos
+            filter:'',          // Variable que usara el buscador para filtrar los registros
+            sortDescAsc:false   // Orden actual del array (descendiente o ascendiente)
         }
     },
     props:{
+        /**
+         *  Cadena de texto para las clases que tendra la tabla
+         */
+        classTable:{
+            type:String,
+            default:''
+        },
+
         /**
          * Array que contiene las cabecera de la tabla
          * ejemplo:
@@ -57,6 +69,7 @@ const tableComponent = Vue.component('table-component', {
             type: Array,
             required: true
         },
+
         /**
          * Array que contiene los elementos que tendra el cuerpo de la tabla (tr y td)
          * [{
@@ -68,16 +81,18 @@ const tableComponent = Vue.component('table-component', {
             type: Array,
             required: true
         },
+
         /**
          * Cantidad de registros por pagina
          */
         forPage:{
             type:Number,
-            default:6
+            default:5
         },
+
         /**
          * Array con los nombres de los atributos a consultar en el objeto json en orden 
-         * para mostrar en cada columna de la tabla
+         * con la cabecera de la tabla para mostrar en cada columna
          * 
          * ejemplo: 
          * ['nombre','apellido','...']
@@ -86,6 +101,7 @@ const tableComponent = Vue.component('table-component', {
             type:Array,
             required:true
         },
+
         /**
          * Varible para activar la columna de las opciones
          */
@@ -136,6 +152,7 @@ const tableComponent = Vue.component('table-component', {
          * Muestro la cantidad de paginas posibles
          */
         pages:function(){
+            this.pagesArray= [];
             let totalItems = this.itemsTotal.length;
             if(totalItems == 0){
                 this.pagesArray.push(1)
@@ -163,10 +180,12 @@ const tableComponent = Vue.component('table-component', {
             }
 
             if(this.currentPage==1){
+                this.setPos(0,this.forPage)
                 return this.itemsTotal.slice(0,this.forPage)
             }else{
                 let since = parseInt(parseInt(this.currentPage)*parseInt(this.forPage))-this.forPage;
                 let until = parseInt(parseInt(this.currentPage)*parseInt(this.forPage));
+                this.setPos(since,until)
                 return this.itemsTotal.slice(since,until)
             }
         }
@@ -194,7 +213,7 @@ const tableComponent = Vue.component('table-component', {
         },
 
         /**
-         * Metodo para filtrar los resultados
+         * Metodo para filtrar los resultados desde el buscador
          */
         filterArray:function(){
             let result = [];
@@ -208,6 +227,34 @@ const tableComponent = Vue.component('table-component', {
                 });
             });
             this.itemsTotal = result;
+        },
+
+        /**
+         *  Metodo para ordernar el array de datos
+         */
+        sortArray:function(sort){
+            this.itemsTotal.sort( (a,b) => {
+                if(this.sortDescAsc){
+                    //descendiente
+                    return a[sort] > b[sort] ? -1:1;
+                }else{
+                    //ascendiente
+                    return a[sort] > b[sort] ? 1:-1;
+                }
+                return 0;
+            })
+            this.sortDescAsc = this.sortDescAsc == true ? false:true
+        },
+
+        /**
+         *  Método para setear la posicion del objeto dentro del array
+         */
+        setPos:function(since, until){
+            for (let index = since; index <= until; index++) {
+                if(this.itemsTotal[index] != undefined){
+                    this.itemsTotal[index].positionJson = index;
+                }
+            }
         }
     }
 })
