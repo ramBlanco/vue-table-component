@@ -6,36 +6,48 @@ const tableComponent = Vue.component('table-component', {
             <input placeholder="Filtrar" id="buscador" class="validate" type="text" v-model="filter" v-on:keyup="filterArray()">
         </div>
         <div class="col s12">
-            <table :class="classTable">
+            <table v-bind:class="classTable">
                 <thead>
                     <tr>
-                        <th v-for="(header, header_index) in headerTable" v-on:click="sortArray(attrDisplay[header_index])"> {{ header }} </th>
+                        <th v-for="(header, header_index) in headerTable" v-on:click="sortArray(attrDisplay[header_index])"> {{ header.nombre }} </th>
                         <th v-if="actions"> {{ actionHeaders }} </th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="(body, body_index) in bodyTableRender">
-                        <td v-for="(att, attr_index) in attrDisplay"> {{ displayAttr(body,att) }} </td>
+                        <td v-for="(att, attr_index) in attrDisplay" 
+                            v-on:click="exeEvent(headerTable[attr_index].event,body)" 
+                            v-bind:class="headerTable[attr_index].event != '' ? 'class-event': ''" > {{ displayAttr(body,att) }} </td>
                         <td v-if="actions">
-                            <button v-for="btn in buttons" :class="btn.class" v-on:click="btnEvents(btn.action, body )"> {{btn.icon}} {{ btn.labelButton }} </button>
+                            <button v-for="btn in buttons" v-bind:class="btn.class" v-on:click="exeEvent(btn.action, body )"> {{btn.icon}} {{ btn.labelButton }} </button>
                         </td>
                     </tr>
                     <tr v-if="bodyTableRender.length == 0">
-                        <td :colspan="headerTable.length"> No se han encontrado registros </td>
+                        <td vbind:colspan="headerTable.length"> No se han encontrado registros </td>
                     </tr>
                 </tbody>
             </table>
         </div>
+        <div class="">
+            <label for="" class="">Cantidad de registros por página:</label>
+            <select class="browser-default" name="" id="" v-model="forPage">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
         <div class="col s12">
-            <ul class="pagination">
-                <li :class="currentPage==1?'hidden_li':''" v-on:click="currentPage = currentPage-1">   
-                    <a href="#!"><i class="mdi-navigation-chevron-left"></i></a>
+            <ul v-bind:class="ulClassPaginate">
+                <li v-bind:class="currentPage==1?'hidden_li':'page-item'" v-on:click="currentPage = currentPage-1">   
+                    <a href="#!" class="page-link"><i :class="liPreview"></i></a>
                 </li>
 
-                <li v-for="(pag, pages_index) in pages" :class="currentPage==pag?'active':''" v-on:click="changePage(pag)"> <a href="#!">{{pag}} </a></li>
+                <li v-for="(pag, pages_index) in pages" v-bind:class="currentPage==pag?'active page-item':'page-item'" v-on:click="changePage(pag)"> <a href="#!" class="page-link">{{pag}} </a></li>
                 
-                <li :class="currentPage==lastPage || pages.length == 1?'hidden_li':''" v-on:click="currentPage = currentPage+1"><a href="#!">
-                    <i class="mdi-navigation-chevron-right"></i></a>
+                <li v-bind:class="currentPage==lastPage || pages.length == 1?'hidden_li page-item':'page-item'" v-on:click="currentPage = currentPage+1"><a href="#!" class="page-link">
+                    <i v-bind:class="liNext"></i></a>
                 </li>
             </ul>
         </div>
@@ -44,6 +56,7 @@ const tableComponent = Vue.component('table-component', {
     data:function(){
         return {
             currentPage:1,      // Pagina por defecto
+            forPage:10,         // Cantidad de registros por página
             lastPage:'',        // Última página
             pagesArray:[],      // Array que contendra las paginas a mostrar
             itemsTotal:[],      // Array que contendra los datos
@@ -63,7 +76,8 @@ const tableComponent = Vue.component('table-component', {
         /**
          * Array que contiene las cabecera de la tabla
          * ejemplo:
-         *  ['Nombre','Apellido','Direccion']
+         * 
+         * [{nombre:'',event:''}]
          */
         headerTable:{
             type: Array,
@@ -80,14 +94,6 @@ const tableComponent = Vue.component('table-component', {
         bodyTable: {
             type: Array,
             required: true
-        },
-
-        /**
-         * Cantidad de registros por pagina
-         */
-        forPage:{
-            type:Number,
-            default:5
         },
 
         /**
@@ -133,6 +139,30 @@ const tableComponent = Vue.component('table-component', {
         buttons:{
             type:Array,
             required:false
+        },
+
+        /**
+         * Cadena de texto para la clase del ul paginador
+         */
+        ulClassPaginate:{
+            type:String,
+            default:'pagination'
+        },
+
+        /**
+         * Cadena de texto para el li que regresa la página
+         */
+        liPreview:{
+            type:String,
+            default:'mdi-navigation-chevron-left'
+        },
+
+        /**
+         * Cadena de texto para el li que avanza la página
+         */
+        liNext:{
+            type:String,
+            default:'mdi-navigation-chevron-right'
         }
     },
     created:function(){
@@ -159,7 +189,7 @@ const tableComponent = Vue.component('table-component', {
                 return this.pagesArray;
             }else{
                 this.pagesArray= [];
-                this.lastPage = Math.round(totalItems/this.forPage)
+                this.lastPage = Math.ceil((totalItems/this.forPage))
                 if(this.lastPage==0){
                     this.pagesArray.push(1)
                 }else{
@@ -188,15 +218,23 @@ const tableComponent = Vue.component('table-component', {
                 this.setPos(since,until)
                 return this.itemsTotal.slice(since,until)
             }
-        }
+        },
     },
     methods:{
         /**
          * Función que muestra la información en la columna correspondiente
          */
-        displayAttr:function(body, attr){
-            return body[attr];
+        displayAttr:function(obj, attr){
+            if(attr.indexOf('.') == -1){
+                return obj[attr];
+            }else{
+                return viewDataObject(obj, attr);
+            }
         },
+        /**
+         * Funcion que retorna el valor de la posición cuando el objeto es bidimensional
+         */
+        viewDataObject:viewDataObject,
 
         /**
          * Función que realiza el cambio de página
@@ -206,9 +244,9 @@ const tableComponent = Vue.component('table-component', {
         },
 
         /**
-         * Metodo que se emit el evento de los botones
+         * Metodo que emit el evento de los botones
          */
-        btnEvents:function(param,obj){
+        exeEvent:function(param,obj){
             this.$emit(param, obj)
         },
 
@@ -221,7 +259,8 @@ const tableComponent = Vue.component('table-component', {
 
             result_tr.forEach(element => {
                 this.attrDisplay.forEach(element_attr => {
-                    if(element[element_attr].toLowerCase().indexOf(this.filter.toLowerCase()) >= 0){
+                    let search = element_attr.indexOf('.') == -1 ? element[element_attr].toLowerCase() : viewDataObject(element,element_attr)
+                    if(search.indexOf(this.filter.toLowerCase()) >= 0){
                         result.push(element);
                     }
                 });
@@ -258,3 +297,17 @@ const tableComponent = Vue.component('table-component', {
         }
     }
 })
+
+function viewDataObject(obj, attr){
+    console.log(attr)
+    var array_attr = attr.split('.')
+    var data = '';
+    for (let index = 0; index < array_attr.length; index++) {
+        if(data==''){
+            data = obj[array_attr[index]] != undefined ? obj[array_attr[index]] : '' ;
+        }else{
+            data = data[array_attr[index]] != undefined ? data[array_attr[index]] : '';
+        }
+    }
+    return data;
+}
